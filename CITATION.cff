@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: >-
+  This is an independent reimplementation. If you use it, please cite the
+  original paper first, and this software second.
+title: "wax-ot: an independent implementation of WaX"
+abstract: >-
+  Attribution of Wasserstein distances to instance pairs, input features and
+  interpretable subspaces, by layer-wise relevance propagation on the
+  neuralized distance graph.
+type: software
+authors:
+  - family-names: Hassan
+    given-names: Omar A.
+repository-code: "https://github.com/omar-A-hassan/wax-ot"
+license: MIT
+version: 0.1.0
+references:
+  - type: article
+    title: >-
+      Wasserstein Distances Made Explainable: Insights Into Dataset Shifts and
+      Transport Phenomena
+    authors:
+      - family-names: Naumann
+        given-names: Philip
+      - family-names: Kauffmann
+        given-names: Jacob
+      - family-names: Montavon
+        given-names: Gregoire
+    journal: IEEE Transactions on Pattern Analysis and Machine Intelligence
+    volume: 48
+    issue: 6
+    year: 2026
+    doi: 10.1109/TPAMI.2026.3656947
