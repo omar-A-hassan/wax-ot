@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: >-
-  This is an independent reimplementation. If you use it, please cite the
+  This is an independent implementation. If you use it, please cite the
   original paper first, and this software second.
 title: "wax-ot: an independent implementation of WaX"
 abstract: >-
