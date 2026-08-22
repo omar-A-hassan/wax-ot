@@ -27,6 +27,12 @@ from wax.datasets import (
     synthetic_domains,
     synthetic_ts,
 )
+from wax.forward import pairwise_distance
+from wax.wax import (
+    _feature_relevance_beta2,
+    _feature_relevance_loop,
+    instance_relevance,
+)
 
 
 def make_data(n=60, d=5, seed=0, shift=None):
@@ -327,3 +333,56 @@ def test_explain_equals_the_two_step_sequence():
         )
     with pytest.raises(ValueError, match="unknown coupling"):
         explain(X, Y, coupling="nope")
+
+
+@pytest.mark.parametrize("q", [1, 2, 3, np.inf])
+@pytest.mark.parametrize("offset", [0.0, 1e3, 1e6, 1e9])
+def test_beta2_fast_path_equals_the_reference_loop(q, offset):
+    """The closed form must equal the direct sum, and must keep conservation.
+
+    Both parameters matter. The beta = 2 denominator is the Euclidean norm for
+    every q, so reusing the q-norm here would be wrong for q != 2. And the
+    expansion behind the closed form loses all its digits on data with a large
+    offset unless the inputs are centred first, which breaks the conservation
+    property that the whole method rests on.
+    """
+    rng = np.random.default_rng(int(offset) % 97 + 1)
+    X = offset + rng.normal(0.0, 1.0, size=(50, 30))
+    Y = offset + rng.normal(0.0, 1.0, size=(50, 30)) + 0.4
+    c = exact(X, Y, 2, q)
+    W = wasserstein(X, Y, c, 2, q)
+    R_kl = instance_relevance(pairwise_distance(X, Y, q), c.gamma, 2.0, W)
+
+    ref = _feature_relevance_loop(X, Y, R_kl, 2.0)
+    fast = _feature_relevance_beta2(X, Y, R_kl)
+    scale = max(np.abs(ref).max(), 1e-30)
+    assert np.abs(ref - fast).max() / scale < 1e-10
+    assert np.isclose(fast.sum(), W, rtol=1e-8)
+
+
+def test_feature_relevance_dispatches_on_beta():
+    X, Y = make_data(n=30, d=8, seed=21)
+    c = exact(X, Y, 2, 2)
+    W = wasserstein(X, Y, c, 2, 2)
+    R_kl = instance_relevance(pairwise_distance(X, Y, 2), c.gamma, 2.0, W)
+    # beta = 2 takes the closed form
+    assert np.allclose(
+        wax.wax.feature_relevance(X, Y, R_kl, 2.0), _feature_relevance_beta2(X, Y, R_kl)
+    )
+    # every other beta keeps the direct sum
+    for beta in (1.0, 3.0, 4.0):
+        assert np.allclose(
+            wax.wax.feature_relevance(X, Y, R_kl, beta),
+            _feature_relevance_loop(X, Y, R_kl, beta),
+        )
+
+
+def test_beta2_fast_path_handles_many_features():
+    """The shape that the difference tensor cannot reach: it would need 14 GB."""
+    rng = np.random.default_rng(3)
+    X = rng.normal(size=(200, 4000))
+    Y = rng.normal(size=(200, 4000)) + 0.3
+    c = exact(X, Y, 2, 2)
+    a = attribute(X, Y, c)
+    assert a.conserved
+    assert a.R_i.shape == (4000,)

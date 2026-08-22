@@ -99,6 +99,18 @@ Make the scale of all features equal before you calculate the relevance values.
 If you do not do this, the feature with the largest values controls the result.
 The function `wax.datasets.standardize` does this operation.
 
+### Many features
+
+With `beta = 2`, which the parameter heuristic selects whenever `q = 2`, the
+feature relevance has a closed form that needs no difference tensor. Data with
+thousands of features is therefore possible: 1000 by 1000 points with 18000
+features takes about half a second for the relevance step. The tensor form of
+the same calculation would need 144 GB.
+
+Other values of `beta` use the direct sum, which builds a tensor of shape
+`(N, M, d)` in blocks of `chunk_rows` rows. Reduce `chunk_rows` if the memory
+is too large.
+
 ### Subspaces
 
 ```python

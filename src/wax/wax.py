@@ -58,8 +58,57 @@ def feature_relevance(
     """Feature relevance ``R_i`` (equation (3b)).
 
     ``R_i = sum_kl R_kl * |x_ki - y_li|^beta / sum_i |x_ki - y_li|^beta``.
-    ``X`` is processed in blocks so the ``(N, M, d)`` difference tensor never
-    needs to be fully materialized.
+
+    For ``beta = 2`` this has a closed form that needs no difference tensor, and
+    that is the case the parameter heuristic selects whenever ``q = 2``.  Every
+    other ``beta`` uses the direct sum in :func:`_feature_relevance_loop`.
+    """
+    if float(beta) == 2.0:
+        return _feature_relevance_beta2(X, Y, R_kl)
+    return _feature_relevance_loop(X, Y, R_kl, beta, chunk_rows=chunk_rows)
+
+
+def _feature_relevance_beta2(X: np.ndarray, Y: np.ndarray, R_kl: np.ndarray) -> np.ndarray:
+    """Closed form of (3b) for ``beta = 2``.
+
+    With ``beta = 2`` the denominator of (3b) is the squared Euclidean distance
+    for any ``q``, and ``(x_ki - y_li)^2`` expands so that the sum over pairs
+    becomes three matrix products.  Memory is then ``O(N M + N d + M d)``
+    instead of the ``O(N M d)`` difference tensor, which is what makes the
+    thousands-of-features case possible at all.
+
+    Both matrices are centred first.  The relevance depends only on differences,
+    so a shared shift changes nothing, but it removes the cancellation in
+    ``x^2 + y^2 - 2xy`` that otherwise destroys the conservation property on
+    data with a large offset.
+    """
+    mu = 0.5 * (X.mean(axis=0) + Y.mean(axis=0))
+    X = X - mu
+    Y = Y - mu
+    d2 = (X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * (X @ Y.T)
+    np.maximum(d2, 0.0, out=d2)
+    weights = np.zeros_like(d2)
+    nz = d2 > 0.0
+    weights[nz] = R_kl[nz] / d2[nz]
+    return (
+        (X * X).T @ weights.sum(axis=1)
+        + (Y * Y).T @ weights.sum(axis=0)
+        - 2.0 * (X * (weights @ Y)).sum(axis=0)
+    )
+
+
+def _feature_relevance_loop(
+    X: np.ndarray,
+    Y: np.ndarray,
+    R_kl: np.ndarray,
+    beta: float,
+    chunk_rows: int = 2048,
+) -> np.ndarray:
+    """Direct sum for (3b), and the reference the closed form is tested against.
+
+    ``X`` is processed in blocks of ``chunk_rows`` rows, so the difference
+    tensor is ``(chunk_rows, M, d)`` rather than ``(N, M, d)``.  Note that this
+    bounds the memory only when ``N`` is larger than ``chunk_rows``.
     """
     n, d = X.shape
     result = np.zeros(d, dtype=float)
