@@ -85,6 +85,11 @@ def _feature_relevance_beta2(X: np.ndarray, Y: np.ndarray, R_kl: np.ndarray) -> 
     mu = 0.5 * (X.mean(axis=0) + Y.mean(axis=0))
     X = X - mu
     Y = Y - mu
+    # ponytail: the squares are deliberately recomputed below rather than bound
+    # to a name. Squaring costs O(N d) against O(N M d) for the products, so it
+    # is lost in the noise, while holding both arrays raises the peak memory by
+    # 2 N d floats. Measured at N = M = 1000 and d = 18000: no change in time,
+    # 288 MB more at the peak. Memory is the scarce resource here, not time.
     d2 = (X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * (X @ Y.T)
     np.maximum(d2, 0.0, out=d2)
     weights = np.zeros_like(d2)

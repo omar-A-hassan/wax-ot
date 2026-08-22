@@ -378,7 +378,11 @@ def test_feature_relevance_dispatches_on_beta():
 
 
 def test_beta2_fast_path_handles_many_features():
-    """The shape that the difference tensor cannot reach: it would need 14 GB."""
+    """Many features end to end, at a shape the direct sum handles badly.
+
+    The difference tensor for these shapes is 200 * 200 * 4000 * 8 = 1.28 GB,
+    and the loop holds several of them at once. The closed form needs none.
+    """
     rng = np.random.default_rng(3)
     X = rng.normal(size=(200, 4000))
     Y = rng.normal(size=(200, 4000)) + 0.3
