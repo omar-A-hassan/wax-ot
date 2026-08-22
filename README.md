@@ -54,19 +54,36 @@ available:
 
 ```python
 import numpy as np
-from wax import attribute, exact
+import wax
 
 X = np.random.randn(300, 8)
 Y = np.random.randn(300, 8) + np.array([0.6, 0, 0, 0.2, 0, 0, -0.4, 0])
 
-coupling = exact(X, Y, p=2, q=2)        # also: sinkhorn(...) or uniform(...)
-a = attribute(X, Y, coupling, p=2, q=2)
+a = wax.explain(X, Y)
 
 a.W                # the Wasserstein distance
 a.R_i              # relevance of each feature, shape (8,)
 a.R_kl             # relevance of each instance pair, shape (300, 300)
 a.conserved        # True if sum(R_i) and sum(R_kl) are equal to W
 ```
+
+### Other Wasserstein models
+
+The defaults of `wax.explain` are the model of the main experiments in the
+article: the exact coupling with p = q = 2. To use a different model, build the
+coupling and then explain it. The coupling keeps a record of its `p` and `q`,
+and `wax.attribute` reads them. Therefore the transport problem and the
+explanation of it cannot disagree by accident.
+
+```python
+coupling = wax.exact(X, Y, p=3, q=2)   # also wax.sinkhorn or wax.uniform
+a = wax.attribute(X, Y, coupling)      # p and q come from the coupling
+```
+
+Give `p` and `q` to `wax.attribute` only to explain a model other than the one
+the coupling solves. The article does this for the regularized coupling of
+Section IV-B.
+
 
 ### How to read the relevance values
 
@@ -85,10 +102,8 @@ The function `wax.datasets.standardize` does this operation.
 ### Subspaces
 
 ```python
-from wax import uwax_search, uwax_attribute
-
-U, history = uwax_search(X, Y, coupling, r=4, dims=[1, 1, 1], seed=0)
-s = uwax_attribute(X, Y, coupling, U, r=4)
+U, history = wax.uwax_search(X, Y, coupling, r=4, dims=[1, 1, 1], seed=0)
+s = wax.uwax_attribute(X, Y, coupling, U, r=4)
 
 s.R_c              # relevance of each subspace
 s.captured         # the part of W that the subspaces explain
@@ -105,6 +120,10 @@ s.captured         # the part of W that the subspaces explain
 | `wax.metrics` | Symmetric Relevance Gain (eq. 5), cosine similarity (eq. 6) |
 | `wax.baselines` | MeanShift, Occlusion, Coupling, Uniform, Logistic |
 | `wax.datasets` | the UCI loaders and the preprocessing of Supplementary Note E |
+
+The `wax` namespace holds the method. The modules `wax.baselines`,
+`wax.datasets`, `wax.plotting` and `wax.words` support the experiments. They
+are not part of the interface that the version number promises to keep.
 
 ## Verification
 

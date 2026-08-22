@@ -5,11 +5,12 @@ import pytest
 
 import wax
 from wax import (
-    MeanShift,
+    Coupling,
     attribute,
     cosine_similarity,
     eigen_subspace,
     exact,
+    explain,
     sinkhorn,
     srg,
     torch_gradient_attribution,
@@ -18,8 +19,9 @@ from wax import (
     uwax_search,
     wasserstein,
 )
-from wax.baselines import LogisticBaseline
+from wax.baselines import LogisticBaseline, MeanShift
 from wax.datasets import (
+    ABALONE_FEATURES,
     abalone_aging_split,
     standardize,
     synthetic_domains,
@@ -218,7 +220,7 @@ def test_datasets_smoke():
 def test_abalone_aging_split_smoke():
     X, Y, names = abalone_aging_split(n=200, seed=0)
     assert X.shape == (200, 7) == Y.shape
-    assert names == wax.ABALONE_FEATURES
+    assert names == ABALONE_FEATURES
     c = exact(X, Y, 2, 2)
     a = attribute(X, Y, c, 2, 2)
     assert a.conserved
@@ -276,3 +278,52 @@ def test_standardize_leaves_constant_columns_alone():
     Y = np.ones((5, 2))
     Xs, Ys = standardize(X, Y)
     assert np.all(np.isfinite(Xs)) and np.all(np.isfinite(Ys))
+
+
+def test_coupling_records_its_wasserstein_model():
+    X, Y = make_data(n=30, d=3, seed=12)
+    for factory in factories():
+        c = factory(X, Y, 3, 2)
+        assert (c.p, c.q) == (3.0, 2.0)
+    assert (Coupling(gamma=np.ones((2, 2)) / 4).p, Coupling(gamma=np.ones((2, 2)) / 4).q) == (
+        None,
+        None,
+    )
+
+
+def test_attribute_takes_p_and_q_from_the_coupling():
+    """The exponents cannot disagree by accident any more.
+
+    Passing them explicitly is still allowed, because the paper explains a
+    different model than the coupling solves for the regularized variant.
+    """
+    X, Y = make_data(n=40, d=4, seed=13)
+    c = exact(X, Y, 3, 2)
+    assert np.isclose(attribute(X, Y, c).W, attribute(X, Y, c, 3, 2).W, rtol=1e-12)
+    # an explicit override still works and still conserves
+    other = attribute(X, Y, c, 2, 2)
+    assert other.conserved
+    assert not np.isclose(other.W, attribute(X, Y, c).W)
+
+
+def test_attribute_reports_unknown_exponents_for_a_hand_made_coupling():
+    X, Y = make_data(n=20, d=3, seed=14)
+    c = Coupling(gamma=np.full((20, 20), 1.0 / 400))
+    with pytest.raises(ValueError, match="p and q are unknown"):
+        attribute(X, Y, c)
+    assert attribute(X, Y, c, 2, 2).conserved
+
+
+def test_explain_equals_the_two_step_sequence():
+    X, Y = make_data(n=40, d=4, seed=15)
+    short = explain(X, Y)
+    long = attribute(X, Y, exact(X, Y, 2, 2), 2, 2)
+    assert np.isclose(short.W, long.W, rtol=1e-12)
+    assert np.allclose(short.R_i, long.R_i)
+    assert short.conserved
+    for kind, factory in (("sinkhorn", sinkhorn), ("uniform", uniform)):
+        assert np.isclose(
+            explain(X, Y, coupling=kind).W, attribute(X, Y, factory(X, Y, 2, 2), 2, 2).W
+        )
+    with pytest.raises(ValueError, match="unknown coupling"):
+        explain(X, Y, coupling="nope")

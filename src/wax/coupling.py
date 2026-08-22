@@ -36,10 +36,17 @@ class Coupling:
         Joint probability matrix with marginal sums ``1 / N`` and ``1 / M``.
     kind : str
         ``"exact"``, ``"sinkhorn"``, ``"uniform"`` or ``"custom"``.
+    p, q : float or None
+        The Wasserstein model this coupling was built for.  :func:`wax.attribute`
+        reads them so that the exponents cannot silently disagree between the
+        transport problem and the explanation of it.  A coupling built by hand
+        leaves them unset, and then the exponents must be passed explicitly.
     """
 
     gamma: np.ndarray
     kind: str = "custom"
+    p: float | None = None
+    q: float | None = None
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -71,7 +78,7 @@ def exact(X: np.ndarray, Y: np.ndarray, p: float, q: float) -> Coupling:
     b = np.full(m, 1.0 / m)
     C = cost_matrix(X, Y, p, q)
     gamma = ot.emd(a, b, C)
-    return Coupling(gamma=gamma, kind="exact")
+    return Coupling(gamma=gamma, kind="exact", p=float(p), q=float(q))
 
 
 def sinkhorn(
@@ -90,14 +97,16 @@ def sinkhorn(
     C = cost_matrix(X, Y, p, q)
     gamma = ot.sinkhorn(a, b, C, reg=reg, numItermax=max_iter, **kwargs)
     gamma = np.clip(gamma, 0.0, None)
-    return Coupling(gamma=gamma, kind="sinkhorn")
+    return Coupling(gamma=gamma, kind="sinkhorn", p=float(p), q=float(q))
 
 
 def uniform(X: np.ndarray, Y: np.ndarray, p: float, q: float) -> Coupling:
     """The uniform coupling ``gamma[k, l] = 1 / (N M)``.
 
     This is the maximum-entropy limit of the Sinkhorn distance discussed in
-    section IV-B of Naumann et al.
+    section IV-B of Naumann et al.  The coupling itself does not depend on ``p``
+    or ``q``, but they are recorded because they still select the Wasserstein
+    model that the coupling is used with.
     """
     gamma = np.full((len(X), len(Y)), 1.0 / (len(X) * len(Y)))
-    return Coupling(gamma=gamma, kind="uniform")
+    return Coupling(gamma=gamma, kind="uniform", p=float(p), q=float(q))

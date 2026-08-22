@@ -13,7 +13,8 @@ import os
 
 import numpy as np
 
-from wax import CouplingBaseline, MeanShift, attribute, exact
+from wax import attribute, exact
+from wax.baselines import CouplingBaseline, MeanShift
 from wax.datasets import synthetic_domains
 
 FIGDIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "figs")

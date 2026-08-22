@@ -15,16 +15,21 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .coupling import Coupling
+from .coupling import Coupling, exact, sinkhorn, uniform
 from .forward import pairwise_distance, wasserstein
 
 __all__ = [
     "recommend_parameters",
     "instance_relevance",
     "feature_relevance",
+    "Attribution",
     "attribute",
+    "explain",
     "torch_gradient_attribution",
 ]
+
+#: The coupling builders that :func:`explain` accepts by name.
+COUPLINGS = {"exact": exact, "sinkhorn": sinkhorn, "uniform": uniform}
 
 
 def recommend_parameters(p: float, q: float) -> tuple[float, float]:
@@ -104,14 +109,31 @@ def attribute(
     X: np.ndarray,
     Y: np.ndarray,
     coupling: Coupling,
-    p: float,
-    q: float,
+    p: float | None = None,
+    q: float | None = None,
     alpha: float | None = None,
     beta: float | None = None,
     check_conservation: bool = True,
     chunk_rows: int = 2048,
 ) -> Attribution:
-    """Run the full WaX forward/backward pass (Algorithm 1 of the paper)."""
+    """Run the full WaX forward/backward pass (Algorithm 1 of the paper).
+
+    ``p`` and ``q`` default to the values that the coupling was built with, so
+    that the transport problem and the explanation of it cannot disagree by
+    accident.  Pass them only to explain a Wasserstein model other than the one
+    the coupling solves.  The paper does this on purpose for the maximally
+    regularized coupling of Section IV-B.
+    """
+    if p is None:
+        p = coupling.p
+    if q is None:
+        q = coupling.q
+    if p is None or q is None:
+        raise ValueError(
+            "p and q are unknown. Give them to attribute(), or build the "
+            "coupling with wax.exact, wax.sinkhorn or wax.uniform, which "
+            "record them."
+        )
     if alpha is None:
         alpha = p
     if beta is None:
@@ -133,6 +155,34 @@ def attribute(
         beta=beta,
         conserved=conserved,
     )
+
+
+def explain(
+    X: np.ndarray,
+    Y: np.ndarray,
+    p: float = 2.0,
+    q: float = 2.0,
+    coupling: str = "exact",
+    **kwargs,
+) -> Attribution:
+    """Solve the transport problem and explain it in one call.
+
+    This is the short form of the two-step sequence. The defaults are the model
+    of the main experiments in the paper: the exact coupling with p = q = 2.
+
+        a = wax.explain(X, Y)
+
+        # the same operation, written out
+        c = wax.exact(X, Y, p=2, q=2)
+        a = wax.attribute(X, Y, c)
+
+    ``coupling`` selects the transport plan. Use ``"exact"``, ``"sinkhorn"`` or
+    ``"uniform"``. Other keyword arguments go to the coupling function, for
+    example ``reg`` for Sinkhorn.
+    """
+    if coupling not in COUPLINGS:
+        raise ValueError(f"unknown coupling {coupling!r}; use one of {sorted(COUPLINGS)}")
+    return attribute(X, Y, COUPLINGS[coupling](X, Y, p, q, **kwargs))
 
 
 def torch_gradient_attribution(
