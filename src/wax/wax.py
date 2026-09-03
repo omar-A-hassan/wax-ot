@@ -32,6 +32,18 @@ __all__ = [
 COUPLINGS = {"exact": exact, "sinkhorn": sinkhorn, "uniform": uniform}
 
 
+def _resolve_pq(coupling: Coupling, p: float | None, q: float | None) -> tuple[float, float]:
+    """Fall back to the Wasserstein model the coupling was built for."""
+    p = coupling.p if p is None else p
+    q = coupling.q if q is None else q
+    if p is None or q is None:
+        raise ValueError(
+            "p and q are unknown. Pass them, or build the coupling with "
+            "wax.exact, wax.sinkhorn or wax.uniform, which record them."
+        )
+    return float(p), float(q)
+
+
 def recommend_parameters(p: float, q: float) -> tuple[float, float]:
     """The heuristic ``alpha = p``, ``beta = min(p + 2, q)`` of the paper."""
     return float(p), float(min(p + 2.0, q))
@@ -178,16 +190,7 @@ def attribute(
     the coupling solves.  The paper does this on purpose for the maximally
     regularized coupling of Section IV-B.
     """
-    if p is None:
-        p = coupling.p
-    if q is None:
-        q = coupling.q
-    if p is None or q is None:
-        raise ValueError(
-            "p and q are unknown. Give them to attribute(), or build the "
-            "coupling with wax.exact, wax.sinkhorn or wax.uniform, which "
-            "record them."
-        )
+    p, q = _resolve_pq(coupling, p, q)
     if alpha is None:
         alpha = p
     if beta is None:
@@ -243,8 +246,8 @@ def torch_gradient_attribution(
     X: np.ndarray,
     Y: np.ndarray,
     coupling: Coupling,
-    p: float,
-    q: float,
+    p: float | None = None,
+    q: float | None = None,
     alpha: float | None = None,
     beta: float | None = None,
 ) -> Attribution:
@@ -271,6 +274,9 @@ def torch_gradient_attribution(
             "torch_gradient_attribution needs torch: pip install 'wax-ot[torch]'"
         ) from exc
 
+    # resolved the same way as attribute(), or a cross-check of a non-default
+    # model would compare two different Wasserstein distances
+    p, q = _resolve_pq(coupling, p, q)
     if alpha is None:
         alpha = p
     if beta is None:

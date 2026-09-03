@@ -390,3 +390,20 @@ def test_beta2_fast_path_handles_many_features():
     a = attribute(X, Y, c)
     assert a.conserved
     assert a.R_i.shape == (4000,)
+
+
+def test_reference_path_resolves_p_and_q_like_attribute():
+    """Both entry points must read the model off the coupling.
+
+    If only one of them does, cross-checking a non-default model compares two
+    different Wasserstein distances and reports a mismatch that is not there.
+    """
+    pytest.importorskip("torch")
+    X, Y = make_data(n=40, d=5, seed=31)
+    c = exact(X, Y, 3, 2)
+    a = attribute(X, Y, c)
+    r = torch_gradient_attribution(X, Y, c)
+    assert np.isclose(a.W, r.W, rtol=1e-12)
+    assert np.abs(a.R_i - r.R_i).max() < 1e-12
+    with pytest.raises(ValueError, match="p and q are unknown"):
+        torch_gradient_attribution(X, Y, Coupling(gamma=c.gamma))
