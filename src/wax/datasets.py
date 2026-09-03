@@ -468,7 +468,10 @@ def load_wisconsin() -> tuple[np.ndarray, np.ndarray, list[str]]:
 
     Shipped inside scikit-learn, so this one needs no network access.
     """
-    from sklearn.datasets import load_breast_cancer
+    try:
+        from sklearn.datasets import load_breast_cancer
+    except ImportError as exc:
+        raise ImportError("load_wisconsin needs scikit-learn: pip install 'wax-ot[repro]'") from exc
 
     ds = load_breast_cancer()
     X, y = ds.data, ds.target  # 1 = benign, 0 = malignant

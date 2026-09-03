@@ -28,6 +28,23 @@ jobs:
       - run: uv run ruff check
       - run: uv run pytest -q
 
+  # The dependency floors declared in pyproject.toml, pinned exactly. torch is
+  # left out because its Linux wheel is a 2 GB CUDA build; its floor is checked
+  # by hand.
+  floors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: |
+          uv venv --python 3.10
+          uv pip install numpy==1.24.4 scipy==1.10.1 pot==0.9.5 \
+                         matplotlib==3.7.0 scikit-learn==1.2.0 pytest
+          uv pip install --no-deps .
+          .venv/bin/python -m pytest -q
+
   # Everything installed, so nothing skips. This is the job that runs the
   # comparison against the authors' reference implementation.
   full:

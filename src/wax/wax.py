@@ -264,7 +264,12 @@ def torch_gradient_attribution(
     what the package actually uses; it needs PyTorch and materializes the full
     (N, M) graph, so it is not the fast path.
     """
-    import torch  # deferred import: optional dependency
+    try:
+        import torch
+    except ImportError as exc:
+        raise ImportError(
+            "torch_gradient_attribution needs torch: pip install 'wax-ot[torch]'"
+        ) from exc
 
     if alpha is None:
         alpha = p

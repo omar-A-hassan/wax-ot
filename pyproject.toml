@@ -1,6 +1,6 @@
 [project]
 name = "wax-ot"
-version = "0.2.1"
+version = "0.2.2"
 description = "WaX: explainable Wasserstein distances. Attributes a Wasserstein distance to instances, features and subspaces (Naumann, Kauffmann and Montavon, TPAMI 2026)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -21,21 +21,20 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-# The attribution rules are pure numpy and scipy. Everything heavier is an
-# extra, so that `pip install wax-ot` does not pull a deep learning stack in
-# order to evaluate a closed-form expression.
+# Floors are the oldest versions the test suite passes on; the `floors` CI job
+# pins them exactly.
 dependencies = [
-    "numpy>=2.2.6",
-    "pot>=0.9.7.post1",
-    "scipy>=1.15.3",
+    "numpy>=1.24",
+    "pot>=0.9.5",
+    "scipy>=1.10",
 ]
 
 [project.optional-dependencies]
-viz = ["matplotlib>=3.10.9"]
-torch = ["torch>=2.13.0"]
+viz = ["matplotlib>=3.7"]
+torch = ["torch>=2.0"]
 repro = [
     "wax-ot[viz,torch]",
-    "scikit-learn>=1.7.2",
+    "scikit-learn>=1.2",
     "open-clip-torch>=3.3.0",
 ]
 

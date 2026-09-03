@@ -41,7 +41,7 @@ the distance `W_p`. The test suite examines this property.
 pip install wax-ot
 ```
 
-The core package needs numpy, scipy and POT only. Four optional extras are
+The core package needs numpy, scipy and POT only. Three optional extras are
 available:
 
 | Extra | Adds | Necessary for |

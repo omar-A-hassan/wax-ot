@@ -79,9 +79,14 @@ class LogisticBaseline:
         self.max_iter = max_iter
 
     def __call__(self, X: np.ndarray, Y: np.ndarray, p: float, q: float) -> np.ndarray:
-        from sklearn.linear_model import LogisticRegression
-        from sklearn.pipeline import make_pipeline
-        from sklearn.preprocessing import StandardScaler
+        try:
+            from sklearn.linear_model import LogisticRegression
+            from sklearn.pipeline import make_pipeline
+            from sklearn.preprocessing import StandardScaler
+        except ImportError as exc:
+            raise ImportError(
+                "LogisticBaseline needs scikit-learn: pip install 'wax-ot[repro]'"
+            ) from exc
 
         # The source is class 1 so that ``w`` points towards X and the
         # gradient-times-input score below matches the sign of the paper's
