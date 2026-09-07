@@ -470,3 +470,38 @@ def test_chunk_rows_only_splits_when_the_block_is_large():
     assert _chunk_rows(300, 300, 30) == 300
     assert 0 < _chunk_rows(617, 617, 2326) < 617  # large: split
     assert _chunk_rows(10, 10**6, 10**6) == 1     # never below one row
+
+
+def test_uwax_results_do_not_depend_on_the_block_size():
+    """Block size is a memory choice, not a modelling one.
+
+    eigen_subspace accumulates a matrix and then takes its eigenvectors, so a
+    change in summation order could in principle rotate U and move every number
+    downstream. It does not.
+    """
+    import wax.uwax as uwax_mod
+
+    X, Y = make_data(n=80, d=30, seed=61)
+    c = exact(X, Y, 2, 2)
+    real = uwax_mod._chunk_rows
+
+    def run():
+        U1 = eigen_subspace(X, Y, c, [1])
+        U, _ = uwax_search(X, Y, c, r=4, dims=[1, 1], seed=0)
+        return U1, U, uwax_attribute(X, Y, c, U, 4, dims=[1, 1])
+
+    try:
+        uwax_mod._chunk_rows = lambda n, m, d, arrays=2, budget=0: n
+        one_block = run()
+        uwax_mod._chunk_rows = lambda n, m, d, arrays=2, budget=0: 1
+        per_row = run()
+    finally:
+        uwax_mod._chunk_rows = real
+    shipped = run()
+
+    for other in (per_row, shipped):
+        assert np.abs(np.abs(one_block[0].T @ other[0]) - 1.0).max() < 1e-10
+        assert np.abs(one_block[1] - other[1]).max() < 1e-10
+        assert np.abs(one_block[2].R_c - other[2].R_c).max() < 1e-10
+        assert np.abs(one_block[2].R_i - other[2].R_i).max() < 1e-10
+        assert other[2].conserved

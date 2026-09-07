@@ -35,14 +35,16 @@ COUPLINGS = {"exact": exact, "sinkhorn": sinkhorn, "uniform": uniform}
 FEATURE_RELEVANCE_BUDGET = 256_000_000
 
 
-def _chunk_rows(n: int, m: int, d: int, budget: int = FEATURE_RELEVANCE_BUDGET) -> int:
-    """Rows per block of the direct sum, from a memory budget.
+def _chunk_rows(
+    n: int, m: int, d: int, arrays: int = 2, budget: int = FEATURE_RELEVANCE_BUDGET
+) -> int:
+    """Rows per block, from a memory budget.
 
-    Two arrays of ``(chunk, m, d)`` are live at once: the block itself and the
-    einsum temporary. Small blocks are also faster, because a block that does
-    not fit in cache costs far more than the extra Python iterations.
+    ``arrays`` is how many ``(chunk, m, d)`` arrays the block holds at once.
+    Small blocks are also faster, because a block that does not fit in cache
+    costs far more than the extra Python iterations.
     """
-    per_row = 2 * m * d * 8
+    per_row = arrays * m * d * 8
     return int(np.clip(budget // max(per_row, 1), 1, max(n, 1)))
 
 

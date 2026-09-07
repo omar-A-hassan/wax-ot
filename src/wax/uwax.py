@@ -24,6 +24,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .coupling import Coupling
+from .wax import _chunk_rows
 
 __all__ = ["eigen_subspace", "uwax_search", "uwax_attribute", "UwaxResult"]
 
@@ -51,7 +52,7 @@ def _block_gradient(
     w = np.asarray(gamma) * np.power(z2, r / 2.0 - 1.0)
     A = np.zeros((X.shape[1], X.shape[1]), dtype=float)
     n = len(X)
-    chunk = max(1, n // 8)
+    chunk = _chunk_rows(n, len(Y), X.shape[1])
     for start in range(0, n, chunk):
         D = _diff_matrix(X[start : start + chunk], Y)
         A += np.einsum("kli,kl,klj->ij", D, w[start : start + chunk], D)
@@ -63,7 +64,7 @@ def _squared_projections(X: np.ndarray, Y: np.ndarray, U_c: np.ndarray) -> np.nd
     n = len(X)
     M = len(Y)
     z2 = np.empty((n, M), dtype=float)
-    chunk = max(1, n // 8)
+    chunk = _chunk_rows(n, M, X.shape[1])
     for start in range(0, n, chunk):
         D = _diff_matrix(X[start : start + chunk], Y)
         proj = D @ U_c
@@ -94,7 +95,7 @@ def eigen_subspace(
     gamma = np.asarray(coupling.gamma)
     n = len(X)
     A = np.zeros((X.shape[1], X.shape[1]), dtype=float)
-    chunk = max(1, n // 8)
+    chunk = _chunk_rows(n, len(Y), X.shape[1])
     for start in range(0, n, chunk):
         D = _diff_matrix(X[start : start + chunk], Y)
         G = gamma[start : start + chunk]
@@ -272,7 +273,7 @@ def uwax_attribute(
         if denom > 0.0:
             rkl = (num / denom) * R_c[ic]
         R_kl_c.append(rkl)
-        chunk = max(1, n // 8)
+        chunk = _chunk_rows(n, len(Y), d, arrays=3)
         for b0 in range(0, n, chunk):
             D = _diff_matrix(X[b0 : b0 + chunk], Y)
             # fused rank-k projection: (D @ U_c) @ U_c.T  — 64× cheaper than D @ (U_c@U_c.T)
