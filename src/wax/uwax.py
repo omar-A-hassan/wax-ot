@@ -233,10 +233,10 @@ def uwax_attribute(
 ) -> UwaxResult:
     """Compute the subspace attribution of equations (9)-(10).
 
-    ``dims`` must be the block sizes passed to :func:`uwax_search`. The blocks
-    of (8) may have different sizes and cannot be recovered from ``U`` alone,
-    because every column of an orthonormal ``U`` is orthogonal to every other.
-    ``None`` means one column per concept.
+    ``dims`` must be the block sizes given to :func:`uwax_search`. The blocks
+    of (8) may have different sizes, and ``U`` alone does not give them: every
+    column of an orthogonal matrix is orthogonal to every other column.
+    ``None`` means one column for each concept.
     """
     gamma = np.asarray(coupling.gamma)
     n, d = X.shape

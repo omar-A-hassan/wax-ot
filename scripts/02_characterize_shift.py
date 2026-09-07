@@ -1,23 +1,23 @@
 """Script 02 - Section IV.B: characterizing transport phenomena (Table III).
 
-Reproduces Table III of Naumann et al.: mean cosine similarity between the
-ground-truth per-feature transport relevance (equation (6)) and the relevance
-computed by WaX and four baselines, on three periodic UCI series at delays of
-one to six hours.
+Reproduces Table III of Naumann et al. The score is the mean cosine similarity
+between two quantities: the ground-truth per-feature transport relevance of
+equation (6), and the relevance that WaX and four baselines compute. The data
+are three periodic UCI series, at delays of one to six hours.
 
 The protocol follows Supplementary Notes E and G of the arXiv version
 (arXiv:2505.06123), which the IEEE article omits:
 
-* channels with too many missing values are dropped, series are standardized to
-  zero mean and unit variance, and samples that are missing a value or deviate
-  by more than three standard deviations are removed *together with their
-  coupled match*, so the ground-truth coupling stays complete (Note E);
+* channels with too many missing values are dropped, and the series are
+  standardized to zero mean and unit variance. A sample that misses a value, or
+  that deviates by more than three standard deviations, is removed together
+  with its coupled match. The ground-truth coupling then stays complete
+  (Note E);
 * scores are averaged over every source hour ``t`` in ``{0, ..., 23}`` (Note G);
-* crucially, the source and target subsets are drawn from **disjoint** sets of
-  days - ``D~_S = {x_(t+kT)}_(k in K1)`` and ``D~_T = {x_(t+dt+kT)}_(k in K2)``
-  with ``K1`` and ``K2`` a random partition.  This is what stops the method from
-  seeing the ground-truth coupling; reusing the same days inflates WaX from
-  ~0.95 to ~0.98 on Appliances by leaking the pairing (Note G);
+* the source and target subsets come from **disjoint** sets of days -
+  ``D~_S = {x_(t+kT)}_(k in K1)`` and ``D~_T = {x_(t+dt+kT)}_(k in K2)``, with
+  ``K1`` and ``K2`` a random partition. This keeps the ground-truth coupling
+  hidden from the methods (Note G);
 * only cases with at least 50 source and target instances are kept (Note G).
 
 The ground truth of (6) is still computed over the full coupled set - it is the

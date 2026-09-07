@@ -88,11 +88,10 @@ class LogisticBaseline:
                 "LogisticBaseline needs scikit-learn: pip install 'wax-ot[repro]'"
             ) from exc
 
-        # The source is class 1 so that ``w`` points towards X and the
-        # gradient-times-input score below matches the sign of the paper's
-        # R_i = w_i (E[x] - E[y])_i.  Inputs are scaled before fitting: on raw
-        # units the L2 penalty crushes every coefficient and the attribution
-        # collapses to zero.
+        # The source is class 1, so ``w`` points towards X and the
+        # gradient-times-input score keeps the sign of the paper's
+        # R_i = w_i (E[x] - E[y])_i. The scaler is necessary: on raw units the
+        # L2 penalty drives every coefficient towards zero.
         Z = np.vstack([X, Y])
         t = np.concatenate([np.ones(len(X)), np.zeros(len(Y))])
         clf = make_pipeline(

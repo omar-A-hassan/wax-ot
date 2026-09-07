@@ -1,8 +1,8 @@
 """Script 03 - Section VII: exploring an aging phenomenon with U-WaX.
 
-Simulates an abalone cohort observed twice (~one year apart) and decomposes
-the Wasserstein distance into three concept subspaces with U-WaX (r=4),
-contrasting the subspace analysis with a k-means clustering baseline.
+Simulates an abalone cohort observed two times, about one year apart. It then
+decomposes the Wasserstein distance into three concept subspaces with U-WaX
+(r=4), and contrasts that analysis with a k-means clustering baseline.
 """
 
 from __future__ import annotations

@@ -100,24 +100,21 @@ def _feature_relevance_beta2(X: np.ndarray, Y: np.ndarray, R_kl: np.ndarray) -> 
     """Closed form of (3b) for ``beta = 2``.
 
     With ``beta = 2`` the denominator of (3b) is the squared Euclidean distance
-    for any ``q``, and ``(x_ki - y_li)^2`` expands so that the sum over pairs
-    becomes three matrix products.  Memory is then ``O(N M + N d + M d)``
-    instead of the ``O(N M d)`` difference tensor, which is what makes the
-    thousands-of-features case possible at all.
+    for every ``q``. The squared difference expands, so the sum over the pairs
+    becomes three matrix products. The memory is then ``O(N M + N d + M d)``,
+    and not the ``O(N M d)`` of the difference tensor.
 
-    Both matrices are centred first.  The relevance depends only on differences,
-    so a shared shift changes nothing, but it removes the cancellation in
-    ``x^2 + y^2 - 2xy`` that otherwise destroys the conservation property on
-    data with a large offset.
+    The two matrices are centred first. The relevance depends only on the
+    differences, so a shift of both changes no result. The shift removes the
+    cancellation in ``x^2 + y^2 - 2xy``, which loses all precision on data with
+    a large offset.
     """
     mu = 0.5 * (X.mean(axis=0) + Y.mean(axis=0))
     X = X - mu
     Y = Y - mu
-    # ponytail: the squares are deliberately recomputed below rather than bound
-    # to a name. Squaring costs O(N d) against O(N M d) for the products, so it
-    # is lost in the noise, while holding both arrays raises the peak memory by
-    # 2 N d floats. Measured at N = M = 1000 and d = 18000: no change in time,
-    # 288 MB more at the peak. Memory is the scarce resource here, not time.
+    # The squares below are computed twice on purpose. Each one costs O(N d)
+    # against O(N M d) for the products. To keep both arrays instead would add
+    # 2 N d floats to the peak memory, which is the limit here.
     d2 = (X * X).sum(1)[:, None] + (Y * Y).sum(1)[None, :] - 2.0 * (X @ Y.T)
     np.maximum(d2, 0.0, out=d2)
     weights = np.zeros_like(d2)
@@ -273,10 +270,10 @@ def torch_gradient_attribution(
 ) -> Attribution:
     """The authors' reference implementation (Supplementary Note D, Fig. S3).
 
-    A transcription of the published code: two applications of the "detach
-    trick" of (4) - one on layer 1 with ``beta``, one on layer 2 with ``alpha``
-    - make plain automatic differentiation reproduce the LRP rules (3a)-(3b)
-    for *arbitrary* alpha and beta, not only the gradient-identical case
+    A transcription of the published code. The detach operation of (4) is
+    applied two times, once on layer 1 with ``beta`` and once on layer 2 with
+    ``alpha``. Automatic differentiation then reproduces the rules (3a) and
+    (3b) for every alpha and beta, and not only for the case
     ``alpha = p, beta = q`` of Propositions 1 and 2::
 
         z = zbeta * (zq / zbeta).detach()          # value zq, gradient via zbeta
@@ -294,8 +291,6 @@ def torch_gradient_attribution(
             "torch_gradient_attribution needs torch: pip install 'wax-ot[torch]'"
         ) from exc
 
-    # resolved the same way as attribute(), or a cross-check of a non-default
-    # model would compare two different Wasserstein distances
     p, q = _resolve_pq(coupling, p, q)
     if alpha is None:
         alpha = p

@@ -4,18 +4,20 @@ Compares WaX against the MeanShift, Occlusion and Coupling baselines on the
 Symmetric Relevance Gain (equation (5)), over the five Wasserstein models of
 Table I and three of its datasets.
 
-Preprocessing and the bootstrap protocol follow Supplementary Notes E and F of
-the arXiv version (arXiv:2505.06123), which the IEEE article omits.  With them
-the reconstructed datasets match Table I's N/M/d exactly for Wisconsin
-(332/163/30) and Musk1 (133/167/166), and to two rows for Wine (3783 vs 3781 /
-1086 / 12), so the numbers below *are* directly comparable to the paper.
+The preprocessing and the bootstrap protocol follow Supplementary Notes E and
+F of the arXiv version (arXiv:2505.06123), which the IEEE article omits. The
+rebuilt datasets then match the N/M/d of Table I. Wisconsin (332/163/30) and
+Musk1 (133/167/166) match exactly, and Wine has two rows more (3783 against
+3781 / 1086 / 12). The numbers below are therefore comparable to the paper.
 
-The one deviation is the bootstrap budget: Note F averages 100 trials, which
-takes roughly 18 hours for Wine on an 8 GB laptop, so ``--reps`` defaults to 3.
-Pass ``--reps 100`` for the paper's protocol.  Standardization matters a lot
-here - the SRG compares Wasserstein distances across feature subsets and is not
-scale invariant, so on raw units one large-magnitude feature dominates every
-method and all four collapse onto an identical ranking and an identical score.
+The one deviation is the bootstrap budget. Note F averages 100 trials, which
+needs about 18 hours for Wine on an 8 GB laptop, so ``--reps`` defaults to 3.
+Use ``--reps 100`` for the protocol of the paper.
+
+Standardization is necessary here. The SRG compares Wasserstein distances
+across feature subsets and is not scale invariant. On raw units one feature of
+large magnitude dominates every method, and all four give the same ranking and
+the same score.
 """
 
 from __future__ import annotations
@@ -75,9 +77,9 @@ def attributions(X, Y, p, q):
 def run(X, Y, p, q, reps, max_n, seed):
     """Bootstrap SRG scores, following Supplementary Note F.
 
-    Each trial resamples source and target *with replacement* back up to N and M
-    and adds N(0, 1e-8) noise, which the note prescribes to break the ties the
-    duplicate rows would otherwise create in the transport problem.
+    Each trial resamples the source and the target with replacement, back up to
+    N and M. It then adds N(0, 1e-8) noise. The note prescribes this noise to
+    break the ties that the duplicate rows make in the transport problem.
     """
     rng = np.random.default_rng(seed)
     n = len(X) if max_n <= 0 else min(len(X), max_n)

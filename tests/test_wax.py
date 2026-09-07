@@ -82,11 +82,10 @@ def test_gradient_identity(factory, p, q):
 def test_matches_authors_reference_implementation(factory, p, q, alpha, beta):
     """Our closed form must equal the published code of Supplementary Note D.
 
-    ``torch_gradient_attribution`` is a transcription of the authors' Fig. S3,
-    which uses the double "detach trick" and is valid for arbitrary alpha and
-    beta - not only the gradient-identical case of Propositions 1 and 2.  This
-    is the load-bearing faithfulness check for the whole package, so it is held
-    to machine precision rather than a loose tolerance.
+    ``torch_gradient_attribution`` is a transcription of the authors' Fig. S3.
+    It applies the detach operation two times, and is therefore valid for every
+    alpha and beta, not only for the case of Propositions 1 and 2. The tolerance
+    is machine precision, because both sides compute the same function.
     """
     pytest.importorskip("torch")
     X, Y = make_data(n=40, d=5, seed=3)
@@ -244,8 +243,7 @@ def test_abalone_uwax_aging():
     assert len(hist) > 1
 
 def test_synthetic_ts_depends_on_the_delay():
-    """Regression guard: ``dt`` was accepted but never used, so every delay in
-    the script 02 sweep silently produced byte-identical numbers."""
+    """The generated data must change with the delay."""
     truths = []
     for dt in (1, 2, 4):
         Xs, Xt, truth = synthetic_ts(n_days=120, period=24, d=8, t=7, dt=dt, seed=0)
@@ -256,12 +254,12 @@ def test_synthetic_ts_depends_on_the_delay():
 
 
 def test_wax_recovers_synthetic_transport():
-    """Sanity check on the synthetic generator, not a benchmark.
+    """A check on the synthetic generator, not a benchmark.
 
-    Source and target are different samples of one periodic process, so the
-    coupling is not the identity and the recovered relevance is not trivially
-    equal to the ground truth - but WaX should still beat the baselines that
-    only see a mean shift or a decision boundary.
+    The source and the target are different samples of one periodic process.
+    The coupling is therefore not the identity, and the recovered relevance is
+    not equal to the ground truth by construction. WaX must still score above
+    the baselines that see only a mean shift or a decision boundary.
     """
     pytest.importorskip("sklearn")
     Xs, Xt, truth = synthetic_ts(n_days=240, period=24, d=8, t=7, dt=2, seed=0)
@@ -299,10 +297,10 @@ def test_coupling_records_its_wasserstein_model():
 
 
 def test_attribute_takes_p_and_q_from_the_coupling():
-    """The exponents cannot disagree by accident any more.
+    """attribute() takes the exponents from the coupling.
 
-    Passing them explicitly is still allowed, because the paper explains a
-    different model than the coupling solves for the regularized variant.
+    Explicit exponents stay legal. The paper explains a model other than the one
+    the coupling solves for its regularized variant.
     """
     X, Y = make_data(n=40, d=4, seed=13)
     c = exact(X, Y, 3, 2)
@@ -339,13 +337,12 @@ def test_explain_equals_the_two_step_sequence():
 @pytest.mark.parametrize("q", [1, 2, 3, np.inf])
 @pytest.mark.parametrize("offset", [0.0, 1e3, 1e6, 1e9])
 def test_beta2_fast_path_equals_the_reference_loop(q, offset):
-    """The closed form must equal the direct sum, and must keep conservation.
+    """The closed form must equal the direct sum, and must conserve.
 
     Both parameters matter. The beta = 2 denominator is the Euclidean norm for
-    every q, so reusing the q-norm here would be wrong for q != 2. And the
-    expansion behind the closed form loses all its digits on data with a large
-    offset unless the inputs are centred first, which breaks the conservation
-    property that the whole method rests on.
+    every q, and not the q-norm. The expansion behind the closed form also
+    loses all precision on data with a large offset, unless the inputs are
+    centred first.
     """
     rng = np.random.default_rng(int(offset) % 97 + 1)
     X = offset + rng.normal(0.0, 1.0, size=(50, 30))
@@ -411,9 +408,11 @@ def test_reference_path_resolves_p_and_q_like_attribute():
 
 
 def test_uwax_attribute_honours_multi_dimensional_blocks():
-    """Equation (8) allows blocks of different sizes, so dims must come from the
-    caller. The old code inferred it by testing consecutive columns of U for
-    orthogonality, which holds for every orthonormal U and always gave ones."""
+    """Equation (8) allows blocks of different sizes.
+
+    The block sizes must come from the caller. U does not give them: every
+    column of an orthogonal matrix is orthogonal to every other column.
+    """
     X, Y = make_data(n=60, d=6, seed=41)
     c = exact(X, Y, 2, 2)
     U, _ = uwax_search(X, Y, c, r=4, dims=[2, 2], seed=0)
@@ -439,8 +438,8 @@ def test_uwax_attribute_rejects_dims_that_do_not_match_u():
 
 
 def test_uwax_survives_identical_inputs():
-    """W2 is zero, so R_c = S_c^2 / W2 is 0/0 and the tailedness gradient raises
-    on Q^(1-r). Both follow attribute() and return zeros."""
+    """For identical samples W2 is zero. Both paths return zeros, as
+    attribute() does."""
     rng = np.random.default_rng(43)
     Z = rng.normal(size=(40, 5))
     c = exact(Z, Z, 2, 2)
@@ -473,11 +472,11 @@ def test_chunk_rows_only_splits_when_the_block_is_large():
 
 
 def test_uwax_results_do_not_depend_on_the_block_size():
-    """Block size is a memory choice, not a modelling one.
+    """The block size must not change any result.
 
-    eigen_subspace accumulates a matrix and then takes its eigenvectors, so a
-    change in summation order could in principle rotate U and move every number
-    downstream. It does not.
+    eigen_subspace sums a matrix and then takes its eigenvectors. A different
+    order of summation must not rotate U, and must not move the numbers that
+    follow from it.
     """
     import wax.uwax as uwax_mod
 

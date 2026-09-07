@@ -102,13 +102,11 @@ def _read_csv_float(
 ) -> np.ndarray:
     """Read a numeric CSV into a float array, trying a set of delimiters.
 
-    The semicolon-delimited UCI files (Air Quality, Electricity) are written in
-    an Italian/Portuguese locale that uses the comma as the *decimal* separator,
-    so commas are rewritten to points before parsing those.  Candidate parses
-    are then scored by how many finite values they produce: ``np.genfromtxt``
-    returns an all-NaN array for the wrong delimiter rather than raising, and
-    silently losing whole columns that way is the exact failure this guards
-    against.
+    The semicolon-delimited UCI files use the comma as the decimal separator,
+    so the commas become points before the parse. For a wrong delimiter
+    ``np.genfromtxt`` returns an array of NaN and raises no error. Each
+    candidate parse is therefore scored by its number of finite values, and the
+    best parse is returned.
     """
     if hasattr(url_or_path, "seek"):
         url_or_path.seek(0)
@@ -217,12 +215,12 @@ def fetch_air_quality(
 ) -> np.ndarray:
     """UCI Air Quality: hourly multisite pollutant readings (UCI 360).
 
-    The 13 numeric channels are cut to those with at least
-    ``AIR_QUALITY_MIN_COVERAGE`` non-missing values, which drops the four
+    Of the 13 numeric channels, this keeps those with at least
+    ``AIR_QUALITY_MIN_COVERAGE`` non-missing values. That rule drops the four
     reference-analyser channels ``CO(GT)`` (6%), ``NMHC(GT)`` (10%),
-    ``NOx(GT)`` (82%) and ``NO2(GT)`` (82%) and leaves the five metal-oxide
-    sensors, ``C6H6(GT)`` and the three meteorological channels: d = 9, which
-    is the width reported in Table III.  Remaining ``-200`` sentinels are left
+    ``NOx(GT)`` (82%) and ``NO2(GT)`` (82%). It keeps the five metal-oxide
+    sensors, ``C6H6(GT)`` and the three meteorological channels, so d = 9. That
+    is the width in Table III. Remaining ``-200`` sentinels are left
     as ``nan``: Supplementary Note E *removes* samples with missing values for
     the Section IV-B benchmark rather than filling them, so interpolation is
     opt-in.  Returns a float array of shape (n_hours, 9).
@@ -348,17 +346,17 @@ def synthetic_ts(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Synthetic periodic multivariate series with an analytic ground truth.
 
-    A full ``n_days * period`` series is generated and then cut into source and
-    target by :func:`ts_shift`, exactly as the real time series are, so the
-    delay ``dt`` genuinely changes the transport phenomenon.  Each feature is
+    This makes a full ``n_days * period`` series, then cuts it into source and
+    target with :func:`ts_shift`, as it does for the real time series. The
+    delay ``dt`` therefore changes the transport phenomenon. Each feature is
     assigned a type: ``mean`` (an hour-dependent level, i.e. a translation
     between the two hours), ``var`` (an hour-dependent noise scale at constant
     level - invisible to MeanShift) or ``none`` (stationary across hours).
 
-    Note that source and target here are *different samples of the same
-    process*, not a deterministic per-row transformation of one another, so the
-    optimal coupling is not the identity and the recovered relevance is not
-    trivially equal to the ground truth.
+    The source and the target are different samples of the same process. One is
+    not a per-row transformation of the other. The optimal coupling is
+    therefore not the identity, and the recovered relevance is not equal to the
+    ground truth by construction.
     """
     rng = np.random.default_rng(seed)
     kinds = np.resize(
@@ -437,9 +435,8 @@ def standardize(X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 def _uncompress_z(raw: bytes) -> bytes:
     """Decompress Unix ``.Z`` (LZW) data using the system ``gzip``.
 
-    ponytail: a subprocess instead of a pure-python LZW decoder - both GNU and
-    BSD ``gzip`` read ``.Z``, which covers Linux and macOS.  Add the ``unlzw3``
-    dependency if Windows support is ever needed.
+    GNU ``gzip`` and BSD ``gzip`` both read ``.Z``, which covers Linux and
+    macOS. Add the ``unlzw3`` dependency for Windows support.
     """
     import subprocess
 
@@ -481,9 +478,9 @@ def load_wisconsin() -> tuple[np.ndarray, np.ndarray, list[str]]:
 def load_wine_quality() -> tuple[np.ndarray, np.ndarray, list[str]]:
     """UCI Wine Quality, d = 12: source = white wines, target = red wines.
 
-    Figure S1 of the supplement shows WaX explaining "the shift between red and
-    white wine", with ``quality`` among the plotted features, so the label
-    column is kept and d = 12 as in Table I.
+    Figure S1 of the supplement shows the shift between red and white wine, and
+    it plots ``quality`` as one of the features. The label column is therefore
+    kept, and d = 12 as in Table I.
     """
     zip_path = _download_cached(
         "https://archive.ics.uci.edu/static/public/186/wine+quality.zip", "winequality.zip"
@@ -503,13 +500,14 @@ def preprocess_series(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Supplementary Note E preprocessing for the Section IV-B time series.
 
-    Drops channels with too many missing values, standardizes to zero mean and
-    unit variance, and flags as invalid any sample that is still missing a value
-    or that deviates by more than ``outlier_sigma`` standard deviations in any
-    channel.  Returns ``(X_standardized, valid)``; the flags are returned rather
-    than applied because :func:`ts_shift` has to drop a sample's coupled match
-    along with the sample itself, which it can only do once the day structure is
-    known.
+    This drops the channels with too many missing values and standardizes the
+    rest to zero mean and unit variance. It then marks as invalid every sample
+    that still misses a value, or that deviates by more than ``outlier_sigma``
+    standard deviations in any channel.
+
+    The return value is ``(X_standardized, valid)``. The flags are returned and
+    not applied, because :func:`ts_shift` must drop the coupled match of a
+    dropped sample. Only :func:`ts_shift` knows the day structure.
     """
     X = np.asarray(X, dtype=float)
     keep = np.mean(np.isfinite(X), axis=0) >= (1.0 - max_missing)
@@ -531,15 +529,18 @@ def preprocess_tabular(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Supplementary Note E preprocessing for the Section IV-A tabular datasets.
 
-    In the order the note gives: drop features with a high proportion of missing
-    values, drop duplicate instances, drop strong outliers (any feature more
-    than ``outlier_sigma`` standard deviations from its mean, measured on the
-    pooled source and target), then standardize to zero mean and unit variance.
+    The steps are those of the note, in order:
 
-    ponytail: the note's final nearest-neighbour imputation step is not
-    implemented - none of the datasets this repository covers (Musk1, Wine,
-    Wisconsin) has a missing value left at that point.  Add ``KNNImputer`` here
-    if Crime or Mice are ever added.
+    - drop the features with a high proportion of missing values;
+    - drop the duplicate instances;
+    - drop the strong outliers, that is, every instance more than
+      ``outlier_sigma`` standard deviations from the mean in any feature,
+      measured on the pooled source and target;
+    - standardize to zero mean and unit variance.
+
+    The nearest-neighbour imputation of the note is not implemented. No dataset
+    in this package has a missing value at that step. Add ``KNNImputer`` here
+    for the Crime or Mice datasets.
     """
     X = np.asarray(X, dtype=float)
     Y = np.asarray(Y, dtype=float)

@@ -1,11 +1,14 @@
 """Script 05 - Section VIII: differences between two large face datasets.
 
-Embeds capped random samples of LFW and CelebA with a pretrained CLIP ViT-B/32
-(cached, MPS when available), models the shift by the Wasserstein distance
-(p = q = 2), and characterizes it with U-WaX: a one-dimensional main transport
-trend (r = 2) plus a set of one-dimensional sub-shift subspaces (r = 3), each
-described by the English words whose CLIP embeddings align most with the
-subspace.
+Embeds capped random samples of LFW and CelebA with a pretrained CLIP ViT-B/32.
+The embeddings are cached, and the script uses MPS when it is available. It
+models the shift by the Wasserstein distance with p = q = 2, then characterizes
+that shift with U-WaX.
+
+The characterization has two parts: a one-dimensional main transport trend
+(r = 2), and a set of one-dimensional sub-shift subspaces (r = 3). Each
+subspace is described by the English words whose CLIP embeddings align most
+closely with it.
 
 Downloads and caches: CLIP weights (~340 MB), LFW faces (~210 MB) and, unless
 ``--celeba-zip`` points to a local archive, the CelebA aligned images
