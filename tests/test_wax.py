@@ -29,6 +29,7 @@ from wax.datasets import (
 )
 from wax.forward import pairwise_distance
 from wax.wax import (
+    _chunk_rows,
     _feature_relevance_beta2,
     _feature_relevance_loop,
     instance_relevance,
@@ -450,3 +451,22 @@ def test_uwax_survives_identical_inputs():
     assert np.all(np.isfinite(s.R_c)) and np.allclose(s.R_c, 0.0)
     assert np.all(np.isfinite(s.R_i))
     assert attribute(Z, Z, c).conserved
+
+
+@pytest.mark.parametrize("beta", [1.0, 3.0, 4.0])
+def test_block_size_does_not_change_the_direct_sum(beta):
+    X, Y = make_data(n=48, d=40, seed=51)
+    c = exact(X, Y, 2, 3)
+    W = wasserstein(X, Y, c, 2, 3)
+    R_kl = instance_relevance(pairwise_distance(X, Y, 3), c.gamma, 2.0, W)
+    ref = _feature_relevance_loop(X, Y, R_kl, beta, chunk_rows=len(X))
+    for chunk in (None, 1, 7, 1000):
+        got = _feature_relevance_loop(X, Y, R_kl, beta, chunk_rows=chunk)
+        assert np.abs(ref - got).max() < 1e-12
+
+
+def test_chunk_rows_only_splits_when_the_block_is_large():
+    assert _chunk_rows(60, 60, 5) == 60          # small: one block, as before
+    assert _chunk_rows(300, 300, 30) == 300
+    assert 0 < _chunk_rows(617, 617, 2326) < 617  # large: split
+    assert _chunk_rows(10, 10**6, 10**6) == 1     # never below one row

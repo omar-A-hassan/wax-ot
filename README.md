@@ -108,8 +108,8 @@ features takes about half a second for the relevance step. The tensor form of
 the same calculation would need 144 GB.
 
 Other values of `beta` use the direct sum, which builds a tensor of shape
-`(N, M, d)` in blocks of `chunk_rows` rows. Reduce `chunk_rows` if the memory
-is too large.
+`(chunk_rows, M, d)` per block. The block size comes from a memory budget by
+default. Set `chunk_rows` to choose it yourself.
 
 ### Subspaces
 

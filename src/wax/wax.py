@@ -31,6 +31,20 @@ __all__ = [
 #: The coupling builders that :func:`explain` accepts by name.
 COUPLINGS = {"exact": exact, "sinkhorn": sinkhorn, "uniform": uniform}
 
+#: Bytes the working block of the direct sum should stay near.
+FEATURE_RELEVANCE_BUDGET = 256_000_000
+
+
+def _chunk_rows(n: int, m: int, d: int, budget: int = FEATURE_RELEVANCE_BUDGET) -> int:
+    """Rows per block of the direct sum, from a memory budget.
+
+    Two arrays of ``(chunk, m, d)`` are live at once: the block itself and the
+    einsum temporary. Small blocks are also faster, because a block that does
+    not fit in cache costs far more than the extra Python iterations.
+    """
+    per_row = 2 * m * d * 8
+    return int(np.clip(budget // max(per_row, 1), 1, max(n, 1)))
+
 
 def _resolve_pq(coupling: Coupling, p: float | None, q: float | None) -> tuple[float, float]:
     """Fall back to the Wasserstein model the coupling was built for."""
@@ -65,7 +79,7 @@ def feature_relevance(
     Y: np.ndarray,
     R_kl: np.ndarray,
     beta: float,
-    chunk_rows: int = 2048,
+    chunk_rows: int | None = None,
 ) -> np.ndarray:
     """Feature relevance ``R_i`` (equation (3b)).
 
@@ -119,26 +133,30 @@ def _feature_relevance_loop(
     Y: np.ndarray,
     R_kl: np.ndarray,
     beta: float,
-    chunk_rows: int = 2048,
+    chunk_rows: int | None = None,
 ) -> np.ndarray:
     """Direct sum for (3b), and the reference the closed form is tested against.
 
     ``X`` is processed in blocks of ``chunk_rows`` rows, so the difference
-    tensor is ``(chunk_rows, M, d)`` rather than ``(N, M, d)``.  Note that this
-    bounds the memory only when ``N`` is larger than ``chunk_rows``.
+    tensor is ``(chunk_rows, M, d)``. ``None`` derives the block size from
+    :data:`FEATURE_RELEVANCE_BUDGET`.
     """
     n, d = X.shape
+    if chunk_rows is None:
+        chunk_rows = _chunk_rows(n, len(Y), d)
     result = np.zeros(d, dtype=float)
     for start in range(0, n, chunk_rows):
         xb = X[start : start + chunk_rows]
         Rb = R_kl[start : start + chunk_rows]
-        diffs = xb[:, None, :] - Y[None, :, :]  # (nb, M, d)
-        absd = np.abs(diffs)
-        denom = np.power(absd, beta).sum(axis=2)  # (nb, M) = ||Delta||_beta^beta
+        # built and raised in place: one (nb, M, d) array, one power
+        block = xb[:, None, :] - Y[None, :, :]
+        np.abs(block, out=block)
+        np.power(block, beta, out=block)
+        denom = block.sum(axis=2)  # (nb, M) = ||Delta||_beta^beta
         mask = denom > 0.0
         weights = np.zeros_like(denom)
         weights[mask] = Rb[mask] / denom[mask]
-        result += np.einsum("kli,kl->i", np.power(absd, beta), weights)
+        result += np.einsum("kli,kl->i", block, weights)
     return result
 
 
@@ -180,7 +198,7 @@ def attribute(
     alpha: float | None = None,
     beta: float | None = None,
     check_conservation: bool = True,
-    chunk_rows: int = 2048,
+    chunk_rows: int | None = None,
 ) -> Attribution:
     """Run the full WaX forward/backward pass (Algorithm 1 of the paper).
 
