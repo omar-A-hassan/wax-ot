@@ -18,6 +18,7 @@ Relevance is then propagated onto concepts (10a), pairs (10b) and features
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -44,6 +45,8 @@ def _block_gradient(
     ``dQ/dU = Q^{1-r} * sum_kl gamma_kl s^{r-2} D_kl D_kl^T U_c`` with
     ``s = ||U_c^T D_kl||``, i.e. per-pair weight ``gamma_kl * z2^{r/2 - 1}``.
     """
+    if Q <= 0.0:
+        return np.zeros_like(U_c)
     z2 = _squared_projections(X, Y, U_c)
     w = np.asarray(gamma) * np.power(z2, r / 2.0 - 1.0)
     A = np.zeros((X.shape[1], X.shape[1]), dtype=float)
@@ -225,18 +228,21 @@ def uwax_attribute(
     coupling: Coupling,
     U: np.ndarray,
     r: float,
+    dims: Sequence[int] | None = None,
 ) -> UwaxResult:
-    """Compute the subspace attribution of equations (9)-(10)."""
+    """Compute the subspace attribution of equations (9)-(10).
+
+    ``dims`` must be the block sizes passed to :func:`uwax_search`. The blocks
+    of (8) may have different sizes and cannot be recovered from ``U`` alone,
+    because every column of an orthonormal ``U`` is orthogonal to every other.
+    ``None`` means one column per concept.
+    """
     gamma = np.asarray(coupling.gamma)
     n, d = X.shape
 
-    dims = []
-    pos = 0
-    for idx in range(1, U.shape[1] + 1):
-        if idx == U.shape[1] or abs(float(U[:, idx - 1] @ U[:, idx])) < 1e-8:
-            dims.append(idx - pos)
-            pos = idx
-    dims = tuple(dims)
+    dims = tuple(dims) if dims is not None else (1,) * U.shape[1]
+    if sum(dims) != U.shape[1]:
+        raise ValueError(f"dims sum to {sum(dims)}, but U has {U.shape[1]} columns")
 
     z2_c: list[np.ndarray] = []
     S_c = np.empty(len(dims))
@@ -253,7 +259,7 @@ def uwax_attribute(
     from .forward import wasserstein
 
     W2 = wasserstein(X, Y, coupling, 2.0, 2.0)
-    R_c = S_c**2 / W2
+    R_c = S_c**2 / W2 if W2 > 0.0 else np.zeros_like(S_c)
 
     R_kl_c: list[np.ndarray] = []
     R_i_c = np.zeros((len(dims), d), dtype=float)

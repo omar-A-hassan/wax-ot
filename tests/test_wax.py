@@ -407,3 +407,46 @@ def test_reference_path_resolves_p_and_q_like_attribute():
     assert np.abs(a.R_i - r.R_i).max() < 1e-12
     with pytest.raises(ValueError, match="p and q are unknown"):
         torch_gradient_attribution(X, Y, Coupling(gamma=c.gamma))
+
+
+def test_uwax_attribute_honours_multi_dimensional_blocks():
+    """Equation (8) allows blocks of different sizes, so dims must come from the
+    caller. The old code inferred it by testing consecutive columns of U for
+    orthogonality, which holds for every orthonormal U and always gave ones."""
+    X, Y = make_data(n=60, d=6, seed=41)
+    c = exact(X, Y, 2, 2)
+    U, _ = uwax_search(X, Y, c, r=4, dims=[2, 2], seed=0)
+
+    blocks = uwax_attribute(X, Y, c, U, 4, dims=[2, 2])
+    singles = uwax_attribute(X, Y, c, U, 4)
+
+    assert blocks.dims == (2, 2)
+    assert singles.dims == (1, 1, 1, 1)
+    assert blocks.conserved and singles.conserved
+    # sum of S_c^2 is invariant to how the span is subdivided, which is why the
+    # conservation check alone cannot catch a wrong partition
+    assert np.isclose(blocks.R_c.sum(), singles.R_c.sum(), rtol=1e-10)
+    assert not np.isclose(blocks.R_c[0], singles.R_c[0])
+
+
+def test_uwax_attribute_rejects_dims_that_do_not_match_u():
+    X, Y = make_data(n=40, d=5, seed=42)
+    c = exact(X, Y, 2, 2)
+    U, _ = uwax_search(X, Y, c, r=4, dims=[1, 1], seed=0)
+    with pytest.raises(ValueError, match="dims sum to"):
+        uwax_attribute(X, Y, c, U, 4, dims=[1, 1, 1])
+
+
+def test_uwax_survives_identical_inputs():
+    """W2 is zero, so R_c = S_c^2 / W2 is 0/0 and the tailedness gradient raises
+    on Q^(1-r). Both follow attribute() and return zeros."""
+    rng = np.random.default_rng(43)
+    Z = rng.normal(size=(40, 5))
+    c = exact(Z, Z, 2, 2)
+    assert wasserstein(Z, Z, c, 2, 2) == 0.0
+    U, _ = uwax_search(Z, Z, c, r=4, dims=[1, 1], seed=0)
+    assert np.allclose(U.T @ U, np.eye(2), atol=1e-8)
+    s = uwax_attribute(Z, Z, c, U, 4, dims=[1, 1])
+    assert np.all(np.isfinite(s.R_c)) and np.allclose(s.R_c, 0.0)
+    assert np.all(np.isfinite(s.R_i))
+    assert attribute(Z, Z, c).conserved
