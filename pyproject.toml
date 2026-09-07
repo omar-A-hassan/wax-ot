@@ -1,6 +1,6 @@
 [project]
 name = "wax-ot"
-version = "0.2.3"
+version = "0.2.4"
 description = "WaX: explainable Wasserstein distances. Attributes a Wasserstein distance to instances, features and subspaces (Naumann, Kauffmann and Montavon, TPAMI 2026)."
 readme = "README.md"
 requires-python = ">=3.10"
